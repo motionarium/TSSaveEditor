@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v prefix (e.g. 1.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $v = "${{ inputs.version }}".Trim().TrimStart('v','V')
+          } else {
+            $v = "${{ github.ref_name }}".TrimStart('v','V')
+          }
+          if (-not $v) { throw "Version is empty" }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=v$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Publishing version=$v"
+
+      - name: Publish single-file exe
+        shell: pwsh
+        run: |
+          dotnet publish Ets2SaveEditor.App/Ets2SaveEditor.App.csproj `
+            -c Release -r win-x64 --self-contained false `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None -p:DebugSymbols=false `
+            -p:Version=${{ steps.ver.outputs.version }} `
+            -p:AssemblyVersion=${{ steps.ver.outputs.version }}.0 `
+            -p:FileVersion=${{ steps.ver.outputs.version }}.0 `
+            -p:InformationalVersion=${{ steps.ver.outputs.version }} `
+            -o release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: TSSaveEditor ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: release/TSSaveEditor.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
