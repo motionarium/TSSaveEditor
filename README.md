@@ -37,7 +37,6 @@ LICENSE
 zlib.dll
 Ets2SaveEditor.App/               # WPF UI (TSSaveEditor)
 Ets2SaveEditor.Core/              # профили, decrypt, парсинг/запись
-.github/workflows/release.yml     # сборка exe и публикация релиза по тегу
 ```
 
 Сборки (`bin/`, `obj/`, `publish/`, `release/`) в git не входят.
@@ -63,12 +62,11 @@ dotnet publish Ets2SaveEditor.App/Ets2SaveEditor.App.csproj ^
 
 ### Релиз на GitHub
 
-```bash
-git tag v1.1.0
-git push origin v1.1.0
-```
+Собрать exe командой выше, затем создать релиз и приложить `release/TSSaveEditor.exe`:
 
-Workflow `.github/workflows/release.yml` соберёт `TSSaveEditor.exe` и приложит его к релизу.
+```bash
+gh release create v1.1.0 release/TSSaveEditor.exe --title "TSSaveEditor v1.1.0"
+```
 
 ## Безопасность сейвов
 
