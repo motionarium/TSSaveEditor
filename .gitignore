@@ -1,0 +1,47 @@
+# Build outputs
+bin/
+obj/
+publish/
+out/
+dist/
+release/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.DotSettings.user
+
+# Local app settings / runtime junk
+**/settings.ini
+*.tmp
+*.bak
+*.bak.*
+*.log
+
+# Personal / sample save dumps (do not publish)
+SAVE/
+newsave/
+**/game_decrypted.sii
+**/info_decrypted.sii
+**/analysis.txt
+
+# Local unit tests (not published to GitHub)
+Ets2SaveEditor.Tests/
+
+# Accidental root binaries (keep zlib.dll)
+/*.exe
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.idea/
+*.swp
+*~
