@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<RootNamespace>TruckLib.HashFs</RootNamespace>
+		<Authors>skzk</Authors>
+		<Version>0.2.6.0</Version>
+		<Title>TruckLib.HashFs</Title>
+		
+		<RepositoryUrl>https://github.com/sk-zk/TruckLib.HashFs</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		
+		<Description>HashFS (.scs) reader</Description>
+		<PackageProjectUrl>https://github.com/sk-zk/TruckLib/</PackageProjectUrl>
+		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="GisDeflate" Version="1.0.2" />
+	  <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+	  <ProjectReference Include="..\..\TruckLib.Models\TruckLib.Models\TruckLib.Models.csproj" />
+	</ItemGroup>
+  
+</Project>

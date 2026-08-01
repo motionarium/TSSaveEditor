@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34322.80
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TruckLib.Core", "TruckLib.Core\TruckLib.Core.csproj", "{C0464C48-4C80-4719-AF4E-127F3C0008E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TruckLib.Core.Tests", "TruckLib.Core.Tests\TruckLib.Core.Tests.csproj", "{F8B13E99-46EF-4D8C-B04B-4AAE044F3D74}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C0464C48-4C80-4719-AF4E-127F3C0008E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0464C48-4C80-4719-AF4E-127F3C0008E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0464C48-4C80-4719-AF4E-127F3C0008E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0464C48-4C80-4719-AF4E-127F3C0008E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8B13E99-46EF-4D8C-B04B-4AAE044F3D74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8B13E99-46EF-4D8C-B04B-4AAE044F3D74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8B13E99-46EF-4D8C-B04B-4AAE044F3D74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8B13E99-46EF-4D8C-B04B-4AAE044F3D74}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {52CB806D-3611-4E36-9276-DEEA4AE0AA42}
+	EndGlobalSection
+EndGlobal

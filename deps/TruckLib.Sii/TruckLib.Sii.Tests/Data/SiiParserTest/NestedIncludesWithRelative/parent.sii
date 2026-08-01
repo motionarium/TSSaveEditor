@@ -1,0 +1,6 @@
+SiiNunit
+{
+
+@include "subdir1/included1.sui"
+
+}

@@ -54,6 +54,8 @@ namespace Ets2SaveEditor.Core
         public bool IsTruck { get; set; }
         public string DisplayName { get; set; }
         public string LicensePlate { get; set; }
+        /// <summary>Country/style token after '|' in license_plate (e.g. russia, europe).</summary>
+        public string LicensePlateType { get; set; }
         public bool IsAssigned { get; set; }
         public double CabinWear { get; set; }
         public double ChassisWear { get; set; }
@@ -63,14 +65,44 @@ namespace Ets2SaveEditor.Core
         public double BodyWear { get; set; }
         public double FuelRelative { get; set; } = 1.0;
 
-        public string ListLabel
+        public string TitleLabel
         {
             get
             {
                 string name = string.IsNullOrWhiteSpace(DisplayName) ? Id : DisplayName;
-                string plate = string.IsNullOrWhiteSpace(LicensePlate) ? "" : $" · {LicensePlate}";
-                string mark = IsAssigned ? "★ " : "";
-                return mark + name + plate;
+                return name?.Trim() ?? Id;
+            }
+        }
+
+        public string SubtitleLabel
+        {
+            get
+            {
+                string plate = string.IsNullOrWhiteSpace(LicensePlate) ? "" : LicensePlate.Trim();
+                string type = PlateTypeLabel;
+                if (string.IsNullOrEmpty(plate)) return type;
+                if (string.IsNullOrEmpty(type)) return plate;
+                return $"{plate} · {type}";
+            }
+        }
+
+        public string PlateTypeLabel
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(LicensePlateType)) return "";
+                string t = LicensePlateType.Trim().Replace('_', ' ');
+                if (t.Length == 0) return "";
+                return char.ToUpperInvariant(t[0]) + t.Substring(1).ToLowerInvariant();
+            }
+        }
+
+        public string ListLabel
+        {
+            get
+            {
+                string sub = SubtitleLabel;
+                return string.IsNullOrEmpty(sub) ? TitleLabel : $"{TitleLabel} · {sub}";
             }
         }
     }

@@ -18,6 +18,8 @@ x86/
 
 # Local app settings / runtime junk
 **/settings.ini
+**/mods_cache.json
+publish_output.txt
 *.tmp
 *.bak
 *.bak.*

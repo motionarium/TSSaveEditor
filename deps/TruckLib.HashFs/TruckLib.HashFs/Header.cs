@@ -1,0 +1,108 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using TruckLib.HashFs.HashFsV2;
+
+namespace TruckLib.HashFs
+{
+    public abstract class Header
+    {
+        public const uint Magic = 0x23534353; // "SCS#"
+        public ushort Version { get; init; }
+        public ushort Salt { get; set; }
+        public string HashMethod { get; set; }
+        public uint NumEntries { get; set; }
+
+        public static Header Deserialize(BinaryReader r)
+        {
+            var magic = r.ReadUInt32();
+            if ((magic & 0xFFFF) == 0x4B50) // "PK"
+                throw new InvalidDataException("This is a zip file.");
+            if (magic != Magic)
+                throw new InvalidDataException("Probably not a HashFS file.");
+
+            var version = r.ReadUInt16();
+
+            switch (version)
+            {
+                case 1:
+                    var h1 = new HeaderV1();
+                    h1.Salt = r.ReadUInt16();
+                    h1.HashMethod = new string(r.ReadChars(4));
+                    h1.NumEntries = r.ReadUInt32();
+                    h1.StartOffset = r.ReadUInt64();
+                    return h1;
+                case 2:
+                    var h2 = new HeaderV2();
+                    h2.Salt = r.ReadUInt16();
+                    h2.HashMethod = new string(r.ReadChars(4));
+                    h2.NumEntries = r.ReadUInt32();
+                    h2.EntryTableLength = r.ReadUInt32();
+                    h2.NumMetadataEntries = r.ReadUInt32();
+                    h2.MetadataTableLength = r.ReadUInt32();
+                    h2.EntryTableStart = r.ReadUInt64();
+                    h2.MetadataTableStart = r.ReadUInt64();
+                    h2.SecurityDescriptorOffset = r.ReadUInt32();
+                    h2.Platform = (Platform)r.ReadByte();
+                    return h2;
+                default:
+                    throw new NotSupportedException($"HashFS version {version} is not supported");
+            }
+        }
+    }
+
+    public class HeaderV1 : Header
+    {
+        public ulong StartOffset { get; set; }
+
+        public HeaderV1()
+        {
+            Version = 1;
+        }
+
+        public void Serialize(BinaryWriter w)
+        {
+            w.Write(Magic);
+            w.Write(Version);
+            w.Write(Salt);
+            w.Write(Encoding.ASCII.GetBytes(HashMethod));
+            w.Write(NumEntries);
+            w.Write(StartOffset);
+        }
+    }
+
+    public class HeaderV2 : Header
+    {
+        public uint EntryTableLength { get; set; }
+        public uint NumMetadataEntries { get; set; }
+        public uint MetadataTableLength { get; set; }
+        public ulong EntryTableStart { get; set; }
+        public ulong MetadataTableStart { get; set; }
+        public ulong SecurityDescriptorOffset { get; set; }
+        public Platform Platform { get; set; }
+
+        public HeaderV2()
+        {
+            Version = 2;
+        }
+
+        public void Serialize(BinaryWriter w)
+        {
+            w.Write(Magic);
+            w.Write(Version);
+            w.Write(Salt);
+            w.Write(Encoding.ASCII.GetBytes(HashMethod));
+            w.Write(NumEntries);
+            w.Write(EntryTableLength);
+            w.Write(NumMetadataEntries);
+            w.Write(MetadataTableLength);
+            w.Write(EntryTableStart);
+            w.Write(MetadataTableStart);
+            w.Write(SecurityDescriptorOffset);
+            w.Write((byte)Platform);
+        }
+    }
+}

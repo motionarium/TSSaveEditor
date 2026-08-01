@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="SIIDecryptSharp" Version="1.0.1" />
+    <ProjectReference Include="..\deps\TruckLib\TruckLib.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<RootNamespace>TruckLib.Sii</RootNamespace>
+		<Authors>skzk</Authors>
+		<Version>0.2.1</Version>
+		<Title>TruckLib.Sii</Title>
+		
+		<RepositoryUrl>https://github.com/sk-zk/TruckLib.Sii</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		
+		<Description>Readers for Prism3D .sii and .mat files</Description>
+		<PackageProjectUrl>https://github.com/sk-zk/TruckLib/</PackageProjectUrl>
+		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Sprache" Version="2.3.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\TruckLib.Core\TruckLib.Core\TruckLib.Core.csproj" />
+	</ItemGroup>
+
+</Project>

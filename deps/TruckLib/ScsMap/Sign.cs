@@ -1,0 +1,162 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace TruckLib.ScsMap
+{
+    /// <summary>
+    /// A traffic sign or navigation sign.
+    /// </summary>
+    public partial class Sign : SingleNodeItem
+    {
+        /// <inheritdoc/>
+        public override ItemType ItemType => ItemType.Sign;
+
+        /// <inheritdoc/>
+        public override ItemFile DefaultItemFile => ItemFile.Aux;
+
+        /// <summary>
+        /// Gets or sets the sector file this sign should be written to. If it has a traffic rule
+        /// associated with it, set it to <see cref="ItemFile.Base">Base</see>. Otherwise, set it to 
+        /// <see cref="ItemFile.Aux">Aux</see>.
+        /// </summary>
+        public new ItemFile ItemFile
+        {
+            get => base.ItemFile;
+            set => base.ItemFile = value;
+        }
+
+        /// <inheritdoc/>
+        protected override ushort DefaultViewDistance => KdopItem.ViewDistanceClose;
+
+        /// <summary>
+        /// Gets or sets the view distance of the item in meters.
+        /// </summary>
+        public new ushort ViewDistance
+        {
+            get => base.ViewDistance;
+            set => base.ViewDistance = value;
+        }
+
+        /// <summary>
+        /// The unit name of the sign model, as defined in <c>/def/world/sign.sii</c>.
+        /// </summary>
+        public Token Model { get; set; }
+
+        /// <summary>
+        /// The look of the model.
+        /// </summary>
+        public Token Look { get; set; }
+
+        /// <summary>
+        /// The variant of the model.
+        /// </summary>
+        public Token Variant { get; set; }
+
+        /// <summary>
+        /// Sign text for legacy navigation signs.
+        /// </summary>
+        public SignBoard[] SignBoards { get; set; }
+
+        /// <summary>
+        /// Full name of the sign template on this sign, as defined in <c>/def/sign/templates.sii</c>.
+        /// </summary>
+        public string SignTemplate { get; set; }
+
+        /// <summary>
+        /// The attribute overrides applied to the sign template.
+        /// </summary>
+        public List<SignOverride> SignOverrides { get; set; }
+
+        /// <summary>
+        /// The board overrides applied to the sign template.
+        /// </summary>
+        public List<SignBoardOverride> BoardOverrides { get; set; }
+
+        /// <summary>
+        /// Gets or sets if the game will rotate this sign to align with the direction of the closest lane
+        /// of a <see cref="Road">road</see>.
+        /// </summary>
+        public bool FollowRoadDir
+        {
+            get => Kdop.Flags[24];
+            set => Kdop.Flags[24] = value;
+        }
+
+        /// <summary>
+        /// Gets or sets if the item is reflected on water surfaces.
+        /// </summary>
+        public bool WaterReflection
+        {
+            get => Kdop.Flags[26];
+            set => Kdop.Flags[26] = value;
+        }
+
+        /// <summary>
+        /// Gets or sets if this item will render behind a cut plane.
+        /// </summary>
+        public bool IgnoreCutPlanes
+        {
+            get => Kdop.Flags[27];
+            set => Kdop.Flags[27] = value;
+        }
+
+        /// <summary>
+        /// Gets or sets if collision is enabled.
+        /// </summary>
+        public bool Collision
+        {
+            get => !Kdop.Flags[30];
+            set => Kdop.Flags[30] = !value;
+        }
+
+        public Sign() : base() 
+        {
+        }
+
+        internal Sign(bool initFields) : base(initFields)
+        {
+            if (initFields) Init();
+        }
+
+        /// <inheritdoc/>
+        protected override void Init()
+        {
+            base.Init();
+            SignBoards = [];
+            SignOverrides = [];
+        }
+
+        /// <summary>
+        /// Adds a sign to the map.
+        /// </summary>
+        /// <param name="map">The map.</param>
+        /// <param name="position">The position of the sign.</param>
+        /// <param name="model">The unit name of the model.</param>
+        /// <returns>The newly created sign.</returns>
+        public static Sign Add(IItemContainer map, Vector3 position, Token model)
+        {
+            return Add(map, position, model, "");
+        }
+
+        /// <summary>
+        /// Adds a sign to the map.
+        /// </summary>
+        /// <param name="map">The map.</param>
+        /// <param name="position">The position of the sign.</param>
+        /// <param name="model">The unit name of the model.</param>
+        /// <param name="template">The full name of the sign template.</param>
+        /// <returns>The newly created sign.</returns>
+        public static Sign Add(IItemContainer map, Vector3 position, Token model, string template)
+        {
+            var sign = Add<Sign>(map, position);
+            sign.Model = model;
+            sign.SignTemplate = template;
+            return sign;
+        }
+    }
+}

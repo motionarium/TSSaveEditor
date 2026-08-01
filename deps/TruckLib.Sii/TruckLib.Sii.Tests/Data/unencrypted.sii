@@ -1,0 +1,40 @@
+SiiNunit
+{
+save_container : _nameless.26c.4de0.4540 {
+ name: ""
+ time: 607695
+ file_time: 1722624314
+ version: 80
+ info_version: 1
+ dependencies: 22
+ dependencies[0]: "mod|mod_workshop_package.0000000063F05FEE|MAN Euro 6 Pillow of Disapproval"
+ dependencies[1]: "dlc|eut2_balkane|DLC - Road to the Black Sea"
+ dependencies[2]: "dlc|eut2_balkanw|DLC - West Balkans"
+ dependencies[3]: "dlc|eut2_balt|DLC - Beyond the Baltic Sea"
+ dependencies[4]: "dlc|eut2_daf_21|DLC - DAF 2021"
+ dependencies[5]: "dlc|eut2_daf_xd|DLC - DAF XD"
+ dependencies[6]: "dlc|eut2_east|DLC - Going East!"
+ dependencies[7]: "rdlc|eut2_flags_dk|DLC - Danish Paint Jobs"
+ dependencies[8]: "rdlc|eut2_flags_ukr|DLC - Ukrainian Paint Jobs"
+ dependencies[9]: "dlc|eut2_fr|DLC - Vive la France !"
+ dependencies[10]: "rdlc|eut2_heavy_cargo|DLC - Heavy Cargo Pack"
+ dependencies[11]: "dlc|eut2_iberia|DLC - Iberia"
+ dependencies[12]: "dlc|eut2_it|DLC - Italia"
+ dependencies[13]: "dlc|eut2_krone|DLC - Krone Trailer Pack"
+ dependencies[14]: "dlc|eut2_man_tgx|DLC - MAN TGX 2020"
+ dependencies[15]: "dlc|eut2_north|DLC - Scandinavia"
+ dependencies[16]: "rdlc|eut2_oversize|DLC - Special Transport"
+ dependencies[17]: "rdlc|eut2_retecht|DLC - Renault Trucks E-Tech T"
+ dependencies[18]: "rdlc|eut2_rocket_league|DLC - Rocket League"
+ dependencies[19]: "dlc|eut2_scans24e|DLC - Scania S 2024E"
+ dependencies[20]: "rdlc|eut2_schwarzmuller|DLC - Schwarzm\xc3\xbcller Trailer Pack"
+ dependencies[21]: "rdlc|eut2_trailers|DLC - High Power Cargo Pack"
+ info_players_experience: 256750
+ info_unlocked_recruitments: 99
+ info_unlocked_dealers: 96
+ info_visited_cities: 318
+ info_money_account: 111455144
+ info_explored_ratio: &3efa75c5
+}
+
+}

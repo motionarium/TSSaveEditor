@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<RootNamespace>TruckLib.Models</RootNamespace>
+		<Authors>skzk</Authors>
+		<Version>0.4.2.0</Version>
+		<Title>TruckLib.Models</Title>
+		
+		<RepositoryUrl>https://github.com/sk-zk/TruckLib.Models</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		
+		<Description>Readers for Prism3D model files</Description>
+		<PackageProjectUrl>https://github.com/sk-zk/TruckLib/</PackageProjectUrl>
+		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\TruckLib.Core\TruckLib.Core\TruckLib.Core.csproj" />
+	</ItemGroup>
+
+</Project>

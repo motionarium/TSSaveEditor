@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<RootNamespace>TruckLib</RootNamespace>
+		<Authors>skzk</Authors>
+		<Version>0.5.1.0</Version>
+		<Title>TruckLib</Title>
+		<Description>Create and modify ETS2 / ATS maps</Description>
+		<PackageProjectUrl>https://github.com/sk-zk/TruckLib</PackageProjectUrl>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.12.0" />
+		<PackageReference Include="RBush" Version="4.0.0" />
+		<ProjectReference Include="..\TruckLib.HashFs\TruckLib.HashFs\TruckLib.HashFs.csproj" />
+		<ProjectReference Include="..\TruckLib.Models\TruckLib.Models\TruckLib.Models.csproj" />
+		<ProjectReference Include="..\TruckLib.Sii\TruckLib.Sii\TruckLib.Sii.csproj" />
+	</ItemGroup>
+
+</Project>

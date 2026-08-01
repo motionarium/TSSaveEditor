@@ -3,7 +3,7 @@ namespace Ets2SaveEditor.App;
 /// <summary>Single source of truth for app version and GitHub release endpoints.</summary>
 internal static class AppInfo
 {
-    public const string Version = "1.1.0";
+    public const string Version = "1.2.0";
     public const string GitHubOwner = "motionarium";
     public const string GitHubRepo = "TSSaveEditor";
 

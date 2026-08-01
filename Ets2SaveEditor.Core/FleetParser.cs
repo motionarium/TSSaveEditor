@@ -173,13 +173,15 @@ namespace Ets2SaveEditor.Core
         private static FleetUnit ParseTruck(string id, string block, string fullContent)
         {
             string model = ResolveModelName(block, fullContent, isTruck: true);
-            string plate = CleanPlate(Regex.Match(block, @"(?m)^\s*license_plate:\s*""([^""]*)""").Groups[1].Value);
+            SplitPlate(Regex.Match(block, @"(?m)^\s*license_plate:\s*""([^""]*)""").Groups[1].Value,
+                out string plate, out string plateType);
             return new FleetUnit
             {
                 Id = id,
                 IsTruck = true,
                 DisplayName = string.IsNullOrWhiteSpace(model) ? ShortId(id) : model,
                 LicensePlate = plate,
+                LicensePlateType = plateType,
                 CabinWear = ReadWear(block, "cabin_wear"),
                 ChassisWear = ReadWear(block, "chassis_wear"),
                 EngineWear = ReadWear(block, "engine_wear"),
@@ -192,13 +194,15 @@ namespace Ets2SaveEditor.Core
         private static FleetUnit ParseTrailer(string id, string block, string fullContent)
         {
             string model = ResolveModelName(block, fullContent, isTruck: false);
-            string plate = CleanPlate(Regex.Match(block, @"(?m)^\s*license_plate:\s*""([^""]*)""").Groups[1].Value);
+            SplitPlate(Regex.Match(block, @"(?m)^\s*license_plate:\s*""([^""]*)""").Groups[1].Value,
+                out string plate, out string plateType);
             return new FleetUnit
             {
                 Id = id,
                 IsTruck = false,
                 DisplayName = string.IsNullOrWhiteSpace(model) ? ShortId(id) : model,
                 LicensePlate = plate,
+                LicensePlateType = plateType,
                 BodyWear = ReadWear(block, "trailer_body_wear") > 0
                     ? ReadWear(block, "trailer_body_wear")
                     : ReadWear(block, "body_wear"),
@@ -236,13 +240,21 @@ namespace Ets2SaveEditor.Core
             return raw.Replace('.', ' ').Replace('_', ' ');
         }
 
-        private static string CleanPlate(string raw)
+        private static void SplitPlate(string raw, out string plate, out string plateType)
         {
-            if (string.IsNullOrEmpty(raw)) return "";
+            plate = "";
+            plateType = "";
+            if (string.IsNullOrEmpty(raw)) return;
+
             string s = Regex.Replace(raw, @"<[^>]+>", "");
             int pipe = s.IndexOf('|');
-            if (pipe >= 0) s = s.Substring(0, pipe);
-            return Regex.Replace(s, @"\s+", " ").Trim();
+            if (pipe >= 0)
+            {
+                plateType = s.Substring(pipe + 1).Trim();
+                s = s.Substring(0, pipe);
+            }
+
+            plate = Regex.Replace(s, @"\s+", " ").Trim();
         }
 
         private static string ShortId(string id)

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<RootNamespace>TruckLib</RootNamespace>
+		<Authors>skzk</Authors>
+		<Version>0.3.0.0</Version>
+		<Title>TruckLib.Core</Title>
+		
+		<RepositoryUrl>https://github.com/sk-zk/TruckLib.Core</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		
+		<Description>Core functionality depended on by multiple TruckLib packages</Description>
+		<PackageProjectUrl>https://github.com/sk-zk/TruckLib/</PackageProjectUrl>
+		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+	</PropertyGroup>
+
+</Project>

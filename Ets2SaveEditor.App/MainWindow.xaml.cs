@@ -54,6 +54,21 @@ namespace Ets2SaveEditor.App
         private bool _updateBusy;
         private enum UpdateButtonMode { Check, Download, OpenRelease }
         private UpdateButtonMode _updateButtonMode = UpdateButtonMode.Check;
+        private MapModDetectionResult _mapDetect;
+        private string _mapArchiveOverride;
+        private ModMapScanResult _modScanCache;
+        private bool _modScanBusy;
+        private int _modScanToken;
+        private string _modsFolderOverride;
+        private int _modsCatalogToken;
+        private ModCatalogSnapshot _modsSnapshot;
+
+        private sealed class ModListRow
+        {
+            public string Label { get; set; }
+            public string Title { get; set; }
+            public string Subtitle { get; set; }
+        }
 
         private sealed class SaveEditSnapshot
         {
@@ -65,8 +80,8 @@ namespace Ets2SaveEditor.App
             public int SkillUrgent;
             public int SkillEco;
             public int SkillValuable;
-            public bool UnlockCities;
-            public bool UpgradeGarages;
+            public bool UnlockMapCities;
+            public bool UnlockMapRoads;
             public bool RepairCabin;
             public bool RepairChassis;
             public bool RepairEngine;
@@ -657,6 +672,7 @@ namespace Ets2SaveEditor.App
             if (NavEconomy != null) { NavEconomy.Content = Loc.T("nav.economy"); NavEconomy.ToolTip = Loc.T("nav.economy.tip"); }
             if (NavMap != null) { NavMap.Content = Loc.T("nav.map"); NavMap.ToolTip = Loc.T("nav.map.tip"); }
             if (NavVehicle != null) { NavVehicle.Content = Loc.T("nav.vehicle"); NavVehicle.ToolTip = Loc.T("nav.vehicle.tip"); }
+            if (NavMods != null) { NavMods.Content = Loc.T("nav.mods"); NavMods.ToolTip = Loc.T("nav.mods.tip"); }
             if (TxtBtnSettings != null) TxtBtnSettings.Text = Loc.T("nav.settings");
             if (BtnOpenSettings != null) BtnOpenSettings.ToolTip = Loc.T("nav.settings.tip");
             if (TxtBtnAbout != null) TxtBtnAbout.Text = Loc.T("nav.about");
@@ -708,12 +724,10 @@ namespace Ets2SaveEditor.App
             if (TxtSplashTagline != null) TxtSplashTagline.Text = Loc.T("splash.tagline");
             if (BtnAppDialogOk != null) BtnAppDialogOk.Content = Loc.T("dialog.ok");
 
-            SetTemplatedText(RadioMapSimple, "txt", "map.mode.simple");
-            SetTemplatedText(RadioMapAdvanced, "txt", "map.mode.advanced");
-
             UpdateNoSaveOverlayLanguage(NoSaveOverlayEconomy);
             UpdateNoSaveOverlayLanguage(NoSaveOverlayMap);
             UpdateNoSaveOverlayLanguage(NoSaveOverlayVehicle);
+            UpdateNoSaveOverlayLanguage(NoSaveOverlayMods);
             UpdateFirstRunLangCards();
 
             Loc.ApplyTree(this);
@@ -945,35 +959,7 @@ namespace Ets2SaveEditor.App
 
         private void MapUiMode_Changed(object sender, RoutedEventArgs e)
         {
-            if (PanelMapSimple == null || GridMapAdvanced == null) return;
-
-            bool showSimple = RadioMapSimple.IsChecked == true;
-
-            // Determine which panel is currently visible (outgoing) and which is incoming
-            FrameworkElement outgoing = showSimple ? (FrameworkElement)GridMapAdvanced : PanelMapSimple;
-            FrameworkElement incoming = showSimple ? (FrameworkElement)PanelMapSimple  : GridMapAdvanced;
-
-            // If outgoing is already collapsed — just show incoming with animation directly
-            if (outgoing.Visibility != Visibility.Visible)
-            {
-                incoming.Visibility = Visibility.Visible;
-                AnimateIn(incoming);
-                return;
-            }
-
-            // Fade-out outgoing, then swap and fade-in incoming
-            var fadeOut = new DoubleAnimation(1, 0, new Duration(TimeSpan.FromMilliseconds(140)))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
-            fadeOut.Completed += (_, _) =>
-            {
-                outgoing.Visibility = Visibility.Collapsed;
-                outgoing.Opacity = 1; // reset for future use
-                incoming.Visibility = Visibility.Visible;
-                AnimateIn(incoming);
-            };
-            outgoing.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            // Removed in 1.2.0 — single map UI.
         }
 
         private void AnimateIn(FrameworkElement element)
@@ -1089,12 +1075,14 @@ namespace Ets2SaveEditor.App
             SetNoSaveOverlayVisible(NoSaveOverlayEconomy, show, shouldAnimate);
             SetNoSaveOverlayVisible(NoSaveOverlayMap, show, shouldAnimate);
             SetNoSaveOverlayVisible(NoSaveOverlayVehicle, show, shouldAnimate);
+            SetNoSaveOverlayVisible(NoSaveOverlayMods, show, shouldAnimate);
 
             if (show)
             {
                 UpdateNoSaveOverlayLanguage(NoSaveOverlayEconomy);
                 UpdateNoSaveOverlayLanguage(NoSaveOverlayMap);
                 UpdateNoSaveOverlayLanguage(NoSaveOverlayVehicle);
+                UpdateNoSaveOverlayLanguage(NoSaveOverlayMods);
             }
         }
 
@@ -1250,6 +1238,18 @@ namespace Ets2SaveEditor.App
             UpdateSaveBarState(dirty);
         }
 
+        private async void ChkUnlockMapRoads_Changed(object sender, RoutedEventArgs e)
+        {
+            RefreshSaveDirtyBar();
+            if (_syncingSaveUi) return;
+            if (ChkUnlockMapRoads?.IsChecked != true) return;
+            if (_modScanBusy) return;
+            if (_modScanCache != null && _modScanCache.DiscoverableUids.Count > 0) return;
+            if (_mapDetect?.Found != true && string.IsNullOrEmpty(_mapArchiveOverride)) return;
+
+            await ScanDetectedMapAsync(includeMapUids: true).ConfigureAwait(true);
+        }
+
         private void SaveField_Changed(object sender, RoutedEventArgs e) => RefreshSaveDirtyBar();
         private void SaveField_Changed(object sender, TextChangedEventArgs e) => RefreshSaveDirtyBar();
         private void SaveField_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => RefreshSaveDirtyBar();
@@ -1266,8 +1266,8 @@ namespace Ets2SaveEditor.App
                 SkillUrgent = (int)(SliderSkillUrgent?.Value ?? 0),
                 SkillEco = (int)(SliderSkillEco?.Value ?? 0),
                 SkillValuable = (int)(SliderSkillValuable?.Value ?? 0),
-                UnlockCities = ChkUnlockCities?.IsChecked == true,
-                UpgradeGarages = ChkUpgradeGarages?.IsChecked == true,
+                UnlockMapCities = ChkUnlockMapCities?.IsChecked == true,
+                UnlockMapRoads = ChkUnlockMapRoads?.IsChecked == true,
                 RepairCabin = ChkRepairCabin?.IsChecked == true,
                 RepairChassis = ChkRepairChassis?.IsChecked == true,
                 RepairEngine = ChkRepairEngine?.IsChecked == true,
@@ -1319,8 +1319,8 @@ namespace Ets2SaveEditor.App
             if (cur.SkillUrgent != c.SkillUrgent) return true;
             if (cur.SkillEco != c.SkillEco) return true;
             if (cur.SkillValuable != c.SkillValuable) return true;
-            if (cur.UnlockCities != c.UnlockCities) return true;
-            if (cur.UpgradeGarages != c.UpgradeGarages) return true;
+            if (cur.UnlockMapCities != c.UnlockMapCities) return true;
+            if (cur.UnlockMapRoads != c.UnlockMapRoads) return true;
             if (cur.RepairCabin != c.RepairCabin) return true;
             if (cur.RepairChassis != c.RepairChassis) return true;
             if (cur.RepairEngine != c.RepairEngine) return true;
@@ -1496,9 +1496,9 @@ namespace Ets2SaveEditor.App
             }
 
             if (TxtCitiesCount != null)
-                TxtCitiesCount.Text = _allCitiesList.Count > 0 ? $"({cityCount})" : "";
+                TxtCitiesCount.Text = cityCount.ToString();
             if (TxtGaragesCount != null)
-                TxtGaragesCount.Text = _allGaragesList.Count > 0 ? $"({garageCount})" : "";
+                TxtGaragesCount.Text = garageCount.ToString();
         }
 
         private void BtnSelectAllCities_Click(object sender, RoutedEventArgs e)
@@ -1807,6 +1807,545 @@ namespace Ets2SaveEditor.App
                 BtnCheckUpdateLabel.Text = Loc.T(buttonKey);
         }
 
+        private async void BtnBrowseMapArchive_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = Loc.T("map.detect.browse"),
+                Filter = "SCS archives (*.scs)|*.scs|All files (*.*)|*.*",
+                Multiselect = false,
+                CheckFileExists = true
+            };
+
+            string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string etsMod = Path.Combine(docs, "Euro Truck Simulator 2", "mod");
+            string atsMod = Path.Combine(docs, "American Truck Simulator", "mod");
+            if (Directory.Exists(etsMod)) dlg.InitialDirectory = etsMod;
+            else if (Directory.Exists(atsMod)) dlg.InitialDirectory = atsMod;
+
+            if (dlg.ShowDialog() != true || string.IsNullOrEmpty(dlg.FileName))
+                return;
+
+            _mapArchiveOverride = dlg.FileName;
+            _modScanCache = null;
+            if (_mapDetect == null)
+                _mapDetect = new MapModDetectionResult();
+            _mapDetect.ArchivePath = dlg.FileName;
+            _mapDetect.DisplayName = Path.GetFileNameWithoutExtension(dlg.FileName);
+            await ScanDetectedMapAsync().ConfigureAwait(true);
+        }
+
+        private async void BtnScanMods_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshModsCatalogAsync(rescan: true).ConfigureAwait(true);
+        }
+
+        private void ChkModsCompatibleOnly_Changed(object sender, RoutedEventArgs e)
+        {
+            BindModsListsFromSnapshot();
+        }
+
+        private async void BtnBrowseModsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            bool preferAts = ComboGame?.SelectedIndex == 1;
+            string initial = _modsFolderOverride
+                ?? ModCatalog.ResolveDefaultModFolder(preferAts)
+                ?? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+            var dlg = new OpenFolderDialog
+            {
+                Title = Loc.T("mods.browse"),
+                InitialDirectory = Directory.Exists(initial) ? initial : null
+            };
+            if (dlg.ShowDialog() != true || string.IsNullOrEmpty(dlg.FolderName))
+                return;
+
+            _modsFolderOverride = dlg.FolderName;
+            await RefreshModsCatalogAsync(rescan: true).ConfigureAwait(true);
+        }
+
+        private async Task RefreshModsCatalogAsync(bool rescan)
+        {
+            if (ListModsFolder == null || ListModsActive == null) return;
+
+            int token = ++_modsCatalogToken;
+            if (TxtModsScanStatus != null)
+                TxtModsScanStatus.Text = Loc.T("mods.status.scanning");
+            if (BtnScanMods != null) BtnScanMods.IsEnabled = false;
+            // Show progress when rescanning or when old cache needs manifest enrich.
+            SetModsScanProgressVisible(true);
+
+            bool preferAts = ComboGame?.SelectedIndex == 1;
+            string? folder = _modsFolderOverride;
+            string? savePath = _selectedSave?.Path;
+
+            ModCatalogSnapshot snap;
+            try
+            {
+                var progress = new Progress<ScanProgressInfo>(info =>
+                {
+                    if (token != _modsCatalogToken) return;
+                    ApplyModsScanProgress(info);
+                });
+
+                snap = await Task.Run(() =>
+                {
+                    string? modFolder = folder;
+                    if (string.IsNullOrWhiteSpace(modFolder))
+                        modFolder = ModCatalog.ResolveDefaultModFolder(preferAts);
+                    return ModCatalog.BuildSnapshot(
+                        modFolder,
+                        savePath,
+                        rescan,
+                        progress: progress,
+                        preferAts: preferAts);
+                }).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                if (token != _modsCatalogToken) return;
+                if (TxtModsScanStatus != null)
+                    TxtModsScanStatus.Text = ex.Message;
+                return;
+            }
+            finally
+            {
+                if (token == _modsCatalogToken)
+                {
+                    if (BtnScanMods != null) BtnScanMods.IsEnabled = true;
+                    SetModsScanProgressVisible(false);
+                }
+            }
+
+            if (token != _modsCatalogToken) return;
+
+            _modsSnapshot = snap;
+
+            if (!string.IsNullOrEmpty(snap.ModFolder))
+                _modsFolderOverride ??= snap.ModFolder;
+
+            if (TxtModsFolderPath != null)
+                TxtModsFolderPath.Text = snap.ModFolder ?? "—";
+
+            if (TxtModsGameVersion != null)
+            {
+                TxtModsGameVersion.Text = string.IsNullOrEmpty(snap.GameVersion)
+                    ? Loc.T("mods.game.version.unknown")
+                    : Loc.Tf("mods.game.version", snap.GameVersion);
+            }
+
+            BindModsListsFromSnapshot();
+        }
+
+        private void BindModsListsFromSnapshot()
+        {
+            if (ListModsFolder == null || ListModsActive == null) return;
+            var snap = _modsSnapshot;
+            if (snap == null)
+            {
+                ListModsFolder.ItemsSource = new[] { new ModListRow { Title = Loc.T("mods.empty.folder"), Subtitle = "", Label = Loc.T("mods.empty.folder") } };
+                ListModsActive.ItemsSource = new[] { new ModListRow { Title = Loc.T("mods.empty.active"), Subtitle = "", Label = Loc.T("mods.empty.active") } };
+                return;
+            }
+
+            bool onlyCompat = ChkModsCompatibleOnly?.IsChecked != false;
+            string? gameVer = snap.GameVersion;
+
+            var activeIds = new HashSet<string>(
+                snap.ActiveMods.Select(m => m.Id),
+                StringComparer.OrdinalIgnoreCase);
+            var folderIds = new HashSet<string>(
+                snap.FolderMods.Select(m => m.Id),
+                StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<ModFolderEntry> folderQuery = snap.FolderMods;
+            if (onlyCompat && !string.IsNullOrEmpty(gameVer))
+                folderQuery = folderQuery.Where(m => ModVersioning.IsCompatibleWith(m, gameVer));
+
+            var folderList = folderQuery.ToList();
+            var folderRows = folderList.Select(m =>
+            {
+                string badge = activeIds.Contains(m.Id) ? Loc.T("mods.badge.active") : "";
+                string ver = FormatModVersions(m.ManifestParsed, m.CompatibleVersions);
+                string sub = $"{m.SizeLabel}  ·  {ver}";
+                if (!string.IsNullOrEmpty(badge))
+                    sub += $"  ·  {badge}";
+                return new ModListRow
+                {
+                    Title = ModVersioning.SanitizeText(m.FileName),
+                    Subtitle = sub,
+                    Label = $"{m.FileName}  ·  {sub}"
+                };
+            }).ToList();
+
+            if (folderRows.Count == 0)
+                folderRows.Add(new ModListRow { Title = Loc.T("mods.empty.folder"), Subtitle = "", Label = Loc.T("mods.empty.folder") });
+
+            var activeRows = snap.ActiveMods.Select(m =>
+            {
+                string name = string.IsNullOrWhiteSpace(m.DisplayName) ? m.Id : m.DisplayName;
+                name = ModVersioning.SanitizeText(name);
+                bool inFolder = folderIds.Contains(m.Id);
+                var bits = new List<string>();
+
+                if (IsWorkshopModId(m.Id))
+                    bits.Add(Loc.T("mods.source.workshop"));
+                else if (!string.IsNullOrWhiteSpace(m.Id)
+                         && !string.Equals(m.Id, name, StringComparison.OrdinalIgnoreCase))
+                    bits.Add(ModVersioning.SanitizeText(m.Id));
+
+                if (inFolder)
+                    bits.Add(FormatModVersions(m.ManifestParsed, m.CompatibleVersions));
+                else
+                    bits.Add(Loc.T("mods.badge.missing"));
+
+                if (m.CompatibleWithGame == false)
+                    bits.Add(Loc.T("mods.badge.incompatible"));
+
+                string sub = string.Join(" · ", bits.Where(s => !string.IsNullOrWhiteSpace(s)));
+                return new ModListRow
+                {
+                    Title = name,
+                    Subtitle = sub,
+                    Label = string.IsNullOrEmpty(sub) ? name : $"{name} · {sub}"
+                };
+            }).ToList();
+
+            if (activeRows.Count == 0)
+                activeRows.Add(new ModListRow { Title = Loc.T("mods.empty.active"), Subtitle = "", Label = Loc.T("mods.empty.active") });
+
+            ListModsFolder.ItemsSource = folderRows;
+            ListModsActive.ItemsSource = activeRows;
+
+            if (TxtModsFolderCount != null)
+                TxtModsFolderCount.Text = folderList.Count.ToString();
+            if (TxtModsActiveCount != null)
+                TxtModsActiveCount.Text = snap.ActiveMods.Count.ToString();
+
+            if (TxtModsScanStatus != null)
+            {
+                if (snap.ScannedAtUtc.HasValue)
+                {
+                    string when = snap.ScannedAtUtc.Value.ToLocalTime().ToString("g");
+                    if (onlyCompat && !string.IsNullOrEmpty(gameVer))
+                        TxtModsScanStatus.Text = Loc.Tf("mods.status.filtered", when, folderList.Count, snap.FolderMods.Count);
+                    else
+                        TxtModsScanStatus.Text = Loc.Tf("mods.status.ready", when, snap.FolderMods.Count);
+                }
+                else
+                    TxtModsScanStatus.Text = Loc.T("mods.status.none");
+
+                if (snap.Warnings.Count > 0)
+                    TxtModsScanStatus.Text += " · " + snap.Warnings[0];
+            }
+        }
+
+        private static string FormatModVersions(bool manifestParsed, IList<string>? versions)
+        {
+            if (!manifestParsed)
+                return Loc.T("mods.ver.unknown");
+            if (versions == null || versions.Count == 0)
+                return Loc.T("mods.ver.all");
+            return string.Join(", ", versions);
+        }
+
+        private static bool IsWorkshopModId(string? id) =>
+            !string.IsNullOrEmpty(id)
+            && id.StartsWith("mod_workshop_package.", StringComparison.OrdinalIgnoreCase);
+
+        private void SetModsScanProgressVisible(bool visible)
+        {
+            if (PanelModsScanProgress != null)
+                PanelModsScanProgress.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (!visible && BarModsScan != null)
+            {
+                BarModsScan.IsIndeterminate = false;
+                BarModsScan.Value = 0;
+            }
+        }
+
+        private void ApplyModsScanProgress(ScanProgressInfo info)
+        {
+            if (PanelModsScanProgress != null && PanelModsScanProgress.Visibility != Visibility.Visible)
+                PanelModsScanProgress.Visibility = Visibility.Visible;
+
+            if (TxtModsScanProgress != null)
+            {
+                TxtModsScanProgress.Text = info.Total > 0
+                    ? Loc.Tf("mods.progress", info.Message ?? "", info.Current, info.Total)
+                    : (info.Message ?? "");
+            }
+
+            if (BarModsScan != null)
+            {
+                if (info.Total <= 0)
+                {
+                    BarModsScan.IsIndeterminate = true;
+                }
+                else
+                {
+                    BarModsScan.IsIndeterminate = false;
+                    BarModsScan.Maximum = 100;
+                    BarModsScan.Value = info.Fraction * 100;
+                }
+            }
+
+            if (TxtModsScanPercent != null)
+            {
+                TxtModsScanPercent.Text = info.Total > 0
+                    ? Loc.Tf("mods.progress.pct", (int)Math.Round(info.Fraction * 100))
+                    : "";
+            }
+        }
+
+        private void RefreshMapDetectSummary()
+        {
+            if (TxtMapDetectSummary == null) return;
+
+            if (_modScanBusy)
+            {
+                TxtMapDetectSummary.Text = Loc.Tf("map.detect.scanning",
+                    ModVersioning.SanitizeText(_mapDetect?.DisplayName ?? _mapDetect?.MapPath ?? "…"));
+                return;
+            }
+
+            if (_modScanCache != null && (_mapDetect?.Found == true || !string.IsNullOrEmpty(_mapArchiveOverride)))
+            {
+                string label = ModVersioning.SanitizeText(
+                    _mapDetect?.DisplayName
+                    ?? Path.GetFileNameWithoutExtension(_mapArchiveOverride ?? _mapDetect?.ArchivePath)
+                    ?? "map");
+                string file = Path.GetFileName(_mapArchiveOverride ?? _mapDetect?.ArchivePath ?? "");
+                TxtMapDetectSummary.Text = Loc.Tf(
+                    "map.detect.ready",
+                    label,
+                    string.IsNullOrEmpty(file) ? $"{_modScanCache.ScannedArchives.Count} scs" : file,
+                    _modScanCache.Cities.Count,
+                    _modScanCache.DiscoverableUids.Count);
+                if (BtnBrowseMapArchive != null)
+                    BtnBrowseMapArchive.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (_mapDetect != null && !string.IsNullOrEmpty(_mapDetect.MapPath) && !_mapDetect.Found)
+            {
+                TxtMapDetectSummary.Text = Loc.Tf("map.detect.missing", _mapDetect.MapPath);
+                if (BtnBrowseMapArchive != null)
+                    BtnBrowseMapArchive.Visibility = Visibility.Visible;
+                return;
+            }
+
+            TxtMapDetectSummary.Text = Loc.T("map.detect.idle");
+            if (BtnBrowseMapArchive != null)
+                BtnBrowseMapArchive.Visibility = Visibility.Collapsed;
+        }
+
+        private async Task DetectAndScanMapAsync()
+        {
+            if (_selectedSave == null) return;
+
+            _modScanCache = null;
+            if (!string.IsNullOrEmpty(_mapArchiveOverride))
+            {
+                var det = await Task.Run(() => MapModDetector.Detect(_selectedSave.Path)).ConfigureAwait(true);
+                _mapDetect = det ?? new MapModDetectionResult();
+                _mapDetect.ArchivePath = _mapArchiveOverride;
+                _mapDetect.DisplayName = Path.GetFileNameWithoutExtension(_mapArchiveOverride);
+            }
+            else
+            {
+                _mapDetect = await Task.Run(() => MapModDetector.Detect(_selectedSave.Path)).ConfigureAwait(true);
+            }
+
+            RefreshMapDetectSummary();
+
+            if (_mapDetect?.Found == true)
+                await ScanDetectedMapAsync().ConfigureAwait(true);
+            else
+                RefreshMapDetectSummary();
+        }
+
+        private async Task ScanDetectedMapAsync(bool includeMapUids = false)
+        {
+            if (_mapDetect == null && string.IsNullOrEmpty(_mapArchiveOverride)) return;
+            if (_modScanBusy) return;
+
+            var paths = _mapDetect != null
+                ? MapModDetector.ResolveScanArchives(_mapDetect, _mapArchiveOverride)
+                : new List<string>();
+            if (!string.IsNullOrEmpty(_mapArchiveOverride)
+                && !paths.Contains(_mapArchiveOverride, StringComparer.OrdinalIgnoreCase))
+                paths.Insert(0, _mapArchiveOverride);
+
+            // ZIP map packs often split map/def/material as sibling .scs in one folder.
+            // Only pull siblings for city defs when browsing — never for full map UID load of every .scs.
+            if (!string.IsNullOrEmpty(_mapArchiveOverride) && !includeMapUids)
+            {
+                string? dir = Path.GetDirectoryName(_mapArchiveOverride);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    foreach (var sib in Directory.EnumerateFiles(dir, "*.scs"))
+                    {
+                        if (!paths.Contains(sib, StringComparer.OrdinalIgnoreCase))
+                            paths.Add(sib);
+                    }
+                }
+            }
+
+            if (paths.Count == 0 && !string.IsNullOrEmpty(_mapArchiveOverride))
+                paths.Add(_mapArchiveOverride);
+
+            if (paths.Count == 0) return;
+
+            // Fog unlock: only the map-owner archive (not every active mod .scs).
+            if (includeMapUids)
+            {
+                string owner = _mapArchiveOverride ?? _mapDetect?.ArchivePath;
+                if (!string.IsNullOrEmpty(owner))
+                    paths = new List<string> { owner };
+                else if (paths.Count > 1)
+                    paths = new List<string> { paths[0] };
+            }
+
+            int token = ++_modScanToken;
+            _modScanBusy = true;
+            SetMapScanProgressVisible(true);
+            RefreshMapDetectSummary();
+
+            string preferred = _mapDetect?.MapPath;
+            try
+            {
+                var progress = new Progress<ScanProgressInfo>(info =>
+                {
+                    if (token != _modScanToken) return;
+                    ApplyMapScanProgress(info);
+                });
+
+                // Keep previous UIDs if this is cities-only refresh after a fog scan.
+                var prevUids = (!includeMapUids && _modScanCache != null)
+                    ? _modScanCache.DiscoverableUids.ToList()
+                    : null;
+
+                ModMapScanResult result = await Task.Run(() =>
+                        ModMapUnlocker.Scan(paths, progress, preferred, includeMapUids))
+                    .ConfigureAwait(true);
+
+                if (token != _modScanToken) return;
+
+                if (prevUids != null && result.DiscoverableUids.Count == 0 && prevUids.Count > 0)
+                    result.DiscoverableUids.AddRange(prevUids);
+
+                _modScanCache = result;
+                if (_mapDetect != null && string.IsNullOrEmpty(_mapDetect.ArchivePath) && paths.Count > 0)
+                    _mapDetect.ArchivePath = paths[0];
+                MergeMapCitiesIntoList(result);
+                RefreshMapDetectSummary();
+
+                // Only popup on fog scan (heavy); city-only noise is shown in summary.
+                if (includeMapUids && result.Warnings.Count > 0)
+                {
+                    string warn = string.Join("\n", result.Warnings.Take(6));
+                    ShowAppDialog(Loc.T("dialog.warning"), Loc.Tf("map.detect.failed", warn), AppDialogKind.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (token != _modScanToken) return;
+                if (includeMapUids)
+                    _modScanCache = null;
+                RefreshMapDetectSummary();
+                ShowAppDialog(Loc.T("dialog.error"), Loc.Tf("map.detect.failed", ex.Message), AppDialogKind.Error);
+            }
+            finally
+            {
+                if (token == _modScanToken)
+                {
+                    _modScanBusy = false;
+                    SetMapScanProgressVisible(false);
+                    RefreshMapDetectSummary();
+                }
+            }
+        }
+
+        private void SetMapScanProgressVisible(bool visible)
+        {
+            if (PanelMapScanProgress != null)
+                PanelMapScanProgress.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (!visible && BarMapScan != null)
+            {
+                BarMapScan.IsIndeterminate = false;
+                BarMapScan.Value = 0;
+            }
+        }
+
+        private void ApplyMapScanProgress(ScanProgressInfo info)
+        {
+            if (PanelMapScanProgress != null && PanelMapScanProgress.Visibility != Visibility.Visible)
+                PanelMapScanProgress.Visibility = Visibility.Visible;
+
+            if (TxtMapDetectSummary != null)
+                TxtMapDetectSummary.Text = Loc.Tf("map.detect.scanning", info.Message ?? "");
+
+            if (TxtMapScanProgress != null)
+            {
+                TxtMapScanProgress.Text = info.Total > 0
+                    ? Loc.Tf("map.detect.progress", info.Message ?? "", info.Current, info.Total)
+                    : (info.Message ?? "");
+            }
+
+            if (BarMapScan != null)
+            {
+                if (info.Total <= 0)
+                {
+                    BarMapScan.IsIndeterminate = true;
+                }
+                else
+                {
+                    BarMapScan.IsIndeterminate = false;
+                    BarMapScan.Maximum = 100;
+                    BarMapScan.Value = info.Fraction * 100;
+                }
+            }
+
+            if (TxtMapScanPercent != null)
+            {
+                TxtMapScanPercent.Text = info.Total > 0
+                    ? Loc.Tf("map.detect.progress.pct", (int)Math.Round(info.Fraction * 100))
+                    : "";
+            }
+        }
+
+        private void MergeMapCitiesIntoList(ModMapScanResult scan)
+        {
+            if (scan == null || _allCitiesList == null) return;
+            bool added = false;
+            var existing = new HashSet<string>(_allCitiesList.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+            foreach (var city in scan.Cities)
+            {
+                if (string.IsNullOrWhiteSpace(city) || existing.Contains(city)) continue;
+                _allCitiesList.Add(new CityItem { Name = city, IsVisited = false });
+                existing.Add(city);
+                added = true;
+            }
+
+            if (!added) return;
+            _allCitiesList.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            if (ListCities != null)
+            {
+                ListCities.ItemsSource = null;
+                ListCities.ItemsSource = _allCitiesList;
+            }
+            UpdateMapListEmptyStates();
+        }
+
+        private async Task<ModMapScanResult> EnsureModScanAsync()
+        {
+            if (_modScanCache != null) return _modScanCache;
+            if (_mapDetect?.Found != true && string.IsNullOrEmpty(_mapArchiveOverride)) return null;
+            await ScanDetectedMapAsync().ConfigureAwait(true);
+            return _modScanCache;
+        }
+
         private void PanelOverlayBackdrop_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (!ReferenceEquals(e.Source, sender)) return;
@@ -1914,10 +2453,14 @@ namespace Ets2SaveEditor.App
                 "NavEconomy" => 0,
                 "NavMap"     => 1,
                 "NavVehicle" => 2,
+                "NavMods"    => 3,
                 _ => 0
             };
 
             MainTabControl.SelectedIndex = tabIndex;
+
+            if (tabIndex == 3)
+                _ = RefreshModsCatalogAsync(rescan: false);
 
             // Soft fade for the newly shown tab content
             if (MainTabControl.SelectedContent is FrameworkElement page)
@@ -2018,8 +2561,9 @@ namespace Ets2SaveEditor.App
                 ComboSave.IsEnabled = hasProfiles && hasProfile;
 
             if (BtnSave != null) BtnSave.IsEnabled = hasSave && HasPendingSaveChanges();
-            if (ChkUnlockCities != null) ChkUnlockCities.IsEnabled = hasSave;
-            if (ChkUpgradeGarages != null) ChkUpgradeGarages.IsEnabled = hasSave;
+            if (ChkUnlockMapCities != null) ChkUnlockMapCities.IsEnabled = hasSave;
+            if (ChkUnlockMapRoads != null) ChkUnlockMapRoads.IsEnabled = hasSave;
+            if (BtnBrowseMapArchive != null) BtnBrowseMapArchive.IsEnabled = hasSave;
 
             // Scroll viewers stay enabled: IsEnabled=false greys text through the overlay.
             // No-save overlay already blocks input.
@@ -2308,6 +2852,7 @@ namespace Ets2SaveEditor.App
                 _allCitiesList = cities;
                 _allGaragesList = garages;
                 SubscribeMapDirtyHandlers();
+                _mapArchiveOverride = null;
 
                 // Reset search boxes
                 if (TxtSearchCities != null) TxtSearchCities.Text = "";
@@ -2325,13 +2870,15 @@ namespace Ets2SaveEditor.App
                     ListGarages.ItemsSource = _allGaragesList;
                 }
 
-                if (ChkUnlockCities != null) ChkUnlockCities.IsChecked = false;
-                if (ChkUpgradeGarages != null) ChkUpgradeGarages.IsChecked = false;
+                if (ChkUnlockMapCities != null) ChkUnlockMapCities.IsChecked = false;
+                if (ChkUnlockMapRoads != null) ChkUnlockMapRoads.IsChecked = false;
                 ClearRepairCheckboxes();
 
                 UpdateMapListEmptyStates();
 
                 CaptureCommittedSaveState();
+                _ = DetectAndScanMapAsync();
+                _ = RefreshModsCatalogAsync(rescan: false);
                 SetStatus(Loc.T("status.loaded"), "#69F0AE");
             }
             catch (Exception ex)
@@ -2531,11 +3078,15 @@ namespace Ets2SaveEditor.App
                     UpdatePlayerLevelFromXp();
                     if (ChkAdr0 != null)
                         ClearAdrCheckboxes();
-                    if (ChkUnlockCities != null) ChkUnlockCities.IsChecked = false;
-                    if (ChkUpgradeGarages != null) ChkUpgradeGarages.IsChecked = false;
+                    if (ChkUnlockMapCities != null) ChkUnlockMapCities.IsChecked = false;
+                    if (ChkUnlockMapRoads != null) ChkUnlockMapRoads.IsChecked = false;
                     ClearRepairCheckboxes();
                 }
                 finally { _syncingSaveUi = false; }
+                _mapDetect = null;
+                _mapArchiveOverride = null;
+                _modScanCache = null;
+                RefreshMapDetectSummary();
                 ClearCommittedSaveState();
                 UpdateMapListEmptyStates();
                 UpdateSelectorsEnabled();
@@ -2583,9 +3134,9 @@ namespace Ets2SaveEditor.App
             SliderSkillValuable.Value = 6;
         }
 
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        private async void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            PerformSaveModification();
+            await PerformSaveModificationAsync();
         }
 
         private bool _syncingRepairChecks;
@@ -2756,6 +3307,11 @@ namespace Ets2SaveEditor.App
             }
             finally { _syncingFleetSelection = false; }
 
+            if (TxtTrucksCount != null)
+                TxtTrucksCount.Text = (_fleetTrucks?.Count ?? 0).ToString();
+            if (TxtTrailersCount != null)
+                TxtTrailersCount.Text = (_fleetTrailers?.Count ?? 0).ToString();
+
             if (ListTrucks?.SelectedItem is FleetUnit truck)
                 ShowTruckUnit(truck);
             if (ListTrailers?.SelectedItem is FleetUnit trailer)
@@ -2789,6 +3345,8 @@ namespace Ets2SaveEditor.App
                 if (ListTrailers != null) ListTrailers.ItemsSource = null;
             }
             finally { _syncingFleetSelection = false; }
+            if (TxtTrucksCount != null) TxtTrucksCount.Text = "0";
+            if (TxtTrailersCount != null) TxtTrailersCount.Text = "0";
         }
 
         private void ListTrucks_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2858,7 +3416,7 @@ namespace Ets2SaveEditor.App
             finally { _syncingRepairChecks = false; }
         }
 
-        private void PerformSaveModification(RepairOptions repair = null)
+        private async Task PerformSaveModificationAsync(RepairOptions repair = null)
         {
             if (_selectedSave == null)
             {
@@ -2868,13 +3426,38 @@ namespace Ets2SaveEditor.App
 
             repair ??= BuildRepairOptionsFromUi();
 
-            bool unlockCities = RadioMapSimple != null && RadioMapSimple.IsChecked == true
-                && ChkUnlockCities != null && ChkUnlockCities.IsChecked == true;
-            bool buyUpgradeGarages = RadioMapSimple != null && RadioMapSimple.IsChecked == true
-                && ChkUpgradeGarages != null && ChkUpgradeGarages.IsChecked == true;
+            bool unlockMapCities = ChkUnlockMapCities?.IsChecked == true;
+            bool unlockMapRoads = ChkUnlockMapRoads?.IsChecked == true;
+
+            if ((unlockMapCities || unlockMapRoads) && _modScanBusy)
+            {
+                ShowAppDialog(Loc.T("dialog.warning"), Loc.T("map.detect.need.scan"), AppDialogKind.Warning);
+                return;
+            }
+
+            if ((unlockMapCities || unlockMapRoads)
+                && string.IsNullOrEmpty(_mapArchiveOverride)
+                && _mapDetect?.Found != true
+                && _modScanCache == null)
+            {
+                ShowAppDialog(Loc.T("dialog.warning"), Loc.T("map.detect.need.archive"), AppDialogKind.Warning);
+                return;
+            }
 
             try
             {
+                ModMapScanResult modScan = null;
+                if (unlockMapCities || unlockMapRoads)
+                {
+                    SetStatus(Loc.Tf("map.detect.scanning", "…"), "#FFD700");
+                    modScan = await EnsureModScanAsync().ConfigureAwait(true);
+                    if (modScan == null)
+                    {
+                        ShowAppDialog(Loc.T("dialog.error"), Loc.Tf("map.detect.failed", "scan returned no data"), AppDialogKind.Error);
+                        return;
+                    }
+                }
+
                 SetStatus(Loc.T("status.writing"), "#FFD700");
 
                 string gameSii = Path.Combine(_selectedSave.Path, "game.sii");
@@ -2917,32 +3500,50 @@ namespace Ets2SaveEditor.App
                     { "heavy",     (int)SliderSkillValuable.Value }
                 };
 
-                List<string> selectedVisitedCities = null;
-                Dictionary<string, int> selectedGarages = null;
-
-                if (RadioMapAdvanced != null && RadioMapAdvanced.IsChecked == true)
+                var selectedVisitedCities = new List<string>();
+                foreach (var city in _allCitiesList)
                 {
-                    selectedVisitedCities = new List<string>();
-                    foreach (var city in _allCitiesList)
-                    {
-                        if (city.IsVisited)
-                            selectedVisitedCities.Add(city.Name);
-                    }
+                    if (city.IsVisited)
+                        selectedVisitedCities.Add(city.Name);
+                }
 
-                    selectedGarages = new Dictionary<string, int>();
-                    foreach (var garage in _allGaragesList)
+                if (unlockMapCities && modScan != null)
+                {
+                    foreach (var city in modScan.Cities)
                     {
-                        selectedGarages[garage.BlockName] = garage.Status;
+                        if (!string.IsNullOrWhiteSpace(city)
+                            && !selectedVisitedCities.Contains(city, StringComparer.OrdinalIgnoreCase))
+                            selectedVisitedCities.Add(city);
                     }
                 }
 
+                var selectedGarages = new Dictionary<string, int>();
+                foreach (var garage in _allGaragesList)
+                    selectedGarages[garage.BlockName] = garage.Status;
+
+                string workingText = decryptedText;
+                var modLogParts = new List<string>();
+                if (modScan != null && (unlockMapCities || unlockMapRoads))
+                {
+                    workingText = ExplorationUnlockWriter.Apply(
+                        workingText,
+                        unlockMapCities ? modScan.Cities : null,
+                        unlockMapRoads ? modScan.DiscoverableUids : null,
+                        markCompaniesDiscovered: unlockMapCities);
+
+                    if (unlockMapCities)
+                        modLogParts.Add(Loc.Tf("map.detect.log.cities", modScan.Cities.Count));
+                    if (unlockMapRoads)
+                        modLogParts.Add(Loc.Tf("map.detect.log.roads", modScan.DiscoverableUids.Count));
+                }
+
                 string modifiedText = SaveParser.ProcessSaveFile(
-                    decryptedText,
+                    workingText,
                     money,
                     xp,
                     skills,
-                    unlockCities,
-                    buyUpgradeGarages,
+                    unlockCities: false,
+                    buyUpgradeGarages: false,
                     repair,
                     out string log,
                     selectedVisitedCities,
@@ -2953,12 +3554,18 @@ namespace Ets2SaveEditor.App
 
                 SetStatus(Loc.T("status.saved"), "#69F0AE");
 
-                if (unlockCities && ChkUnlockCities != null)
-                    ChkUnlockCities.IsChecked = false;
-                if (buyUpgradeGarages && ChkUpgradeGarages != null)
-                    ChkUpgradeGarages.IsChecked = false;
+                if (unlockMapCities && ChkUnlockMapCities != null)
+                    ChkUnlockMapCities.IsChecked = false;
+                if (unlockMapRoads && ChkUnlockMapRoads != null)
+                    ChkUnlockMapRoads.IsChecked = false;
                 if (repair.Any)
                     ClearRepairCheckboxes();
+
+                if (modLogParts.Count > 0)
+                {
+                    string modLine = string.Join(" · ", modLogParts);
+                    log = string.IsNullOrWhiteSpace(log) ? modLine : modLine + "\n" + log.Trim();
+                }
 
                 string title = repair.Any ? Loc.T("dialog.repair.done") : Loc.T("dialog.success");
                 string savedMsg = Loc.T("dialog.saved");

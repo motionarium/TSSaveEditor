@@ -1,0 +1,47 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace TruckLib.Sii
+{
+    /// <summary>
+    /// Represents an SII unit.
+    /// </summary>
+    [DebuggerDisplay("{Class, nq} : {Name, nq}")]
+    public class Unit
+    {
+        /// <summary>
+        /// Class name of this unit.
+        /// </summary>
+        public string Class { get; set; }
+
+        /// <summary>
+        /// Name of this unit.
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// Attributes of this unit.
+        /// </summary>
+        public Dictionary<string, dynamic> Attributes { get; set; } = [];
+
+        /// <summary>
+        /// Instantiates an empty unit.
+        /// </summary>
+        public Unit() { }
+
+        /// <summary>
+        /// Instantiates a unit with the given class name and unit name.
+        /// </summary>
+        /// <param name="className">The class name.</param>
+        /// <param name="name">The unit name.</param>
+        public Unit(string className, string name)
+        {
+            Class = className;
+            Name = name;
+        }
+    }
+}
